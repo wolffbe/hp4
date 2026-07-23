@@ -1,0 +1,6 @@
+# scripts only - never commit game files, wrapper binaries, cracks or discs
+*.iso
+*.exe
+*.dll
+*.big
+*.zip
