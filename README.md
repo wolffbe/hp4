@@ -33,20 +33,20 @@ converts as needed.
 ## Usage
 
 ```powershell
-# Install from both discs (auto-detects your resolution and applies it).
-# Sources can be .iso, .bin/.cue, a mounted drive, or a folder:
+# Install from both discs. Sources can be .iso, .bin/.cue, a mounted drive,
+# or a folder:
 powershell -ExecutionPolicy Bypass -File scripts\Install-HPGoF.ps1 -Source HPGOFDisc1_Na.cue -Source2 HPGOFDisc2_Na.cue
 
 # ...or from two mounted discs / ISOs:
 powershell -ExecutionPolicy Bypass -File scripts\Install-HPGoF.ps1 -Source E:\ -Source2 F:\
 
-# Force a resolution, or keep 800x600:
-powershell -ExecutionPolicy Bypass -File scripts\Install-HPGoF.ps1 -Source E:\ -Source2 F:\ -Resolution 2560x1440
-powershell -ExecutionPolicy Bypass -File scripts\Install-HPGoF.ps1 -Source E:\ -Source2 F:\ -SkipResolution
-
 # To revert everything:
 powershell -ExecutionPolicy Bypass -File scripts\Uninstall-HPGoF.ps1 -RemoveFiles
 ```
+
+The default install directory is
+`C:\Program Files (x86)\Electronic Arts\Harry Potter and the Goblet of Fire`
+(override with `-Dest`).
 
 If a source is omitted, the script auto-detects a mounted disc carrying the
 matching payload.
@@ -64,10 +64,6 @@ keys.
 - Copies the loose support files (`Support\`, `eauninstall.exe`, icon).
 - Writes the game's registry entries (install dir, CD drive, locale, language).
 - Sets a high-DPI compatibility flag.
-- Detects the host's **native display resolution** (DPI-independent) and applies
-  it to the game via Chip's D3D9 wrapper, downloaded from its official release —
-  the game is otherwise hard-coded to 800×600. Override with `-Resolution WxH`,
-  or `-SkipResolution` to keep 800×600.
 - Creates Desktop and Start Menu shortcuts.
 
 ### `scripts/Uninstall-HPGoF.ps1`
@@ -98,14 +94,21 @@ is up to you and out of scope for this repository.
   keyboard, and run `GofControls.exe` in the install folder to configure a
   gamepad.
 
+## Recommended additional fixes
+
+The game is hard-coded to 800×600 with no video options. **Chip's**
+(Fix Enhancers) excellent
+[Harry-Potter-and-the-Goblet-of-Fire-PC-Fix](https://github.com/Chip-Biscuit/Harry-Potter-and-the-Goblet-of-Fire-PC-Fix)
+— built on Elisha Riedlinger's
+[d3d8to9 / DirectX wrapper](https://github.com/elishacloud/dxwrapper) work —
+adds custom resolutions and aspect ratios. This installer does not apply it;
+download it from that repository's releases, set your resolution in its
+`d3d9.ini`, and drop `d3d9.dll` + `d3d9.ini` next to `gof_f.exe` in the
+install folder.
+
 ## Credits
 
-- **Resolution / rendering:** the D3D9 wrapper is
-  [Harry-Potter-and-the-Goblet-of-Fire-PC-Fix](https://github.com/Chip-Biscuit/Harry-Potter-and-the-Goblet-of-Fire-PC-Fix)
-  by **Chip**, built on Elisha Riedlinger's
-  [d3d8to9 / DirectX wrapper](https://github.com/elishacloud/dxwrapper) work.
-  `Install-HPGoF.ps1` downloads it from that repository's official releases; this
-  repo redistributes none of it.
+- **Chip / Fix Enhancers** for the D3D9 resolution fix linked above.
 - Compatibility research: [PCGamingWiki](https://www.pcgamingwiki.com/wiki/Harry_Potter_and_the_Goblet_of_Fire).
 
 ## Legal

@@ -10,19 +10,17 @@
     and the game plays music only.
 
     This script extracts both payloads, copies the support files, writes the
-    registry entries, applies a high-DPI compatibility flag, detects the host's
-    native display resolution and applies it to the game, and creates Desktop +
-    Start Menu shortcuts.
+    registry entries, applies a high-DPI compatibility flag, and creates
+    Desktop + Start Menu shortcuts.
 
     Each source may be a drive letter ("E:"), a disc-root folder, an .iso, or a
     raw .bin/.cue disc image (as distributed by archive.org) - the script mounts
     or converts as needed. If a source is omitted it auto-detects a mounted disc
     carrying the matching payload.
 
-    Resolution: the game is hard-coded to 800x600 and has no video options. It
-    uses Chip's D3D9 wrapper (d3d9.dll + d3d9.ini), downloaded from its official
-    GitHub release, to run at the host resolution. Pass -Resolution WxH to
-    override, or -SkipResolution to leave the game at 800x600.
+    Resolution: the game is hard-coded to 800x600 and has no video options.
+    Chip's D3D9 wrapper (see the README's "Recommended additional fixes")
+    lifts that limit; this script does not apply it.
 
     It installs the disc's own executable as-is. That executable is SafeDisc-
     protected and will NOT launch on Windows 10/11 by itself; obtaining a
@@ -32,9 +30,7 @@
     ----------
     -Source          Disc 1 (0compressed.zip): drive, folder, .iso, or .bin/.cue.
     -Source2         Disc 2 (1compressed.zip): drive, folder, .iso, or .bin/.cue.
-    -Dest            Install directory. Default: C:\Games\Harry Potter and the Goblet of Fire
-    -Resolution      Force a resolution, e.g. "2560x1440". Default: auto-detect.
-    -SkipResolution  Do not install the D3D9 wrapper; leave the game at 800x600.
+    -Dest            Install directory. Default: C:\Program Files (x86)\Electronic Arts\Harry Potter and the Goblet of Fire
 
     Usage:   powershell -File Install-HPGoF.ps1 -Source D:\HPGOFDisc1.iso -Source2 D:\HPGOFDisc2.iso
              powershell -File Install-HPGoF.ps1 -Source HPGOFDisc1_Na.cue -Source2 HPGOFDisc2_Na.cue
@@ -44,9 +40,7 @@
 param(
     [string]$Source,
     [string]$Source2,
-    [string]$Dest = 'C:\Games\Harry Potter and the Goblet of Fire',
-    [string]$Resolution,
-    [switch]$SkipResolution
+    [string]$Dest = "${env:ProgramFiles(x86)}\Electronic Arts\Harry Potter and the Goblet of Fire"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,30 +55,12 @@ if (-not $isAdmin) {
     if ($Source)         { $a += @('-Source',"`"$Source`"") }
     if ($Source2)        { $a += @('-Source2',"`"$Source2`"") }
     $a += @('-Dest',"`"$Dest`"")
-    if ($Resolution)     { $a += @('-Resolution',$Resolution) }
-    if ($SkipResolution) { $a += '-SkipResolution' }
     Start-Process powershell -Verb RunAs -ArgumentList $a
     return
 }
 
 $script:toDismount = @()   # ISO image paths to dismount at the end
 $script:toDelete   = @()   # temp .iso files (converted from .bin) to delete
-
-# True physical screen resolution, independent of Windows DPI scaling.
-function Get-NativeResolution {
-    Add-Type -Name ScrCaps -Namespace HPGoF -MemberDefinition @'
-[DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr h);
-[DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr h, IntPtr dc);
-[DllImport("gdi32.dll")] public static extern int GetDeviceCaps(IntPtr dc, int idx);
-'@ -ErrorAction SilentlyContinue
-    $dc = [HPGoF.ScrCaps]::GetDC([IntPtr]::Zero)
-    try {
-        [pscustomobject]@{
-            Width  = [HPGoF.ScrCaps]::GetDeviceCaps($dc, 118)   # DESKTOPHORZRES
-            Height = [HPGoF.ScrCaps]::GetDeviceCaps($dc, 117)   # DESKTOPVERTRES
-        }
-    } finally { [void][HPGoF.ScrCaps]::ReleaseDC([IntPtr]::Zero, $dc) }
-}
 
 # Convert a raw MODE1/2352 .bin CD image to a 2048-byte/sector .iso.
 function Convert-BinToIso {
@@ -168,41 +144,6 @@ function Expand-Payload {
     } finally { $zip.Dispose() }
 }
 
-# Downloads Chip's D3D9 wrapper and writes it into the game folder configured
-# for the given resolution and the nearest aspect-ratio preset.
-function Set-GameResolution {
-    param([string]$Dest, [int]$Width, [int]$Height)
-    $ratio   = $Width / $Height
-    $presets = @{ 1 = 1.778; 2 = 1.600; 3 = 2.370; 4 = 2.389; 5 = 2.400; 6 = 3.200 }
-    $aspect  = ($presets.GetEnumerator() | Sort-Object { [math]::Abs($_.Value - $ratio) } | Select-Object -First 1).Key
-
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $ua  = @{ 'User-Agent' = 'hp4-installer' }
-    $api = 'https://api.github.com/repos/Chip-Biscuit/Harry-Potter-and-the-Goblet-of-Fire-PC-Fix/releases/latest'
-    $url = ((Invoke-RestMethod $api -Headers $ua).assets |
-                Where-Object { $_.name -like '*.zip' } | Select-Object -First 1).browser_download_url
-    if (-not $url) { throw "Could not find the D3D9 fix download in the latest release." }
-
-    $zip = Join-Path $env:TEMP 'hp4fix.zip'
-    $out = Join-Path $env:TEMP 'hp4fix_extract'
-    Invoke-WebRequest $url -OutFile $zip -Headers $ua
-    if (Test-Path $out) { Remove-Item $out -Recurse -Force }
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $out)
-
-    $dll = Get-ChildItem $out -Recurse -Filter d3d9.dll | Select-Object -First 1
-    $ini = Get-ChildItem $out -Recurse -Filter d3d9.ini | Select-Object -First 1
-    if (-not ($dll -and $ini)) { throw "D3D9 fix archive did not contain d3d9.dll/d3d9.ini." }
-
-    $c = Get-Content $ini.FullName -Raw
-    $c = [regex]::Replace($c, '(?im)^(\s*width\s*=\s*)\d+',                  "`${1}$Width")
-    $c = [regex]::Replace($c, '(?im)^(\s*height\s*=\s*)\d+',                 "`${1}$Height")
-    $c = [regex]::Replace($c, '(?im)^(\s*fullscreenaspectratio\s*=\s*)\d+',  "`${1}$aspect")
-    [IO.File]::WriteAllText((Join-Path $Dest 'd3d9.ini'), $c)
-    Copy-Item $dll.FullName (Join-Path $Dest 'd3d9.dll') -Force
-    return "$Width`x$Height (aspect preset $aspect)"
-}
-
 Write-Host "Harry Potter and the Goblet of Fire - manual install" -ForegroundColor Cyan
 
 try {
@@ -255,26 +196,7 @@ try {
     Set-ItemProperty $layers -Name $exe -Value '~ HIGHDPIAWARE'
     Write-Host "  set high-DPI compatibility flag" -ForegroundColor Green
 
-    # --- 5. detect host resolution and apply it to the game ------------------
-    if ($SkipResolution) {
-        Write-Host "  resolution: skipped (game stays at 800x600)" -ForegroundColor Gray
-    } else {
-        try {
-            if ($Resolution -match '^\s*(\d+)\s*[xX]\s*(\d+)\s*$') {
-                $w = [int]$Matches[1]; $h = [int]$Matches[2]
-            } else {
-                $nat = Get-NativeResolution; $w = $nat.Width; $h = $nat.Height
-            }
-            if ($w -gt 0 -and $h -gt 0) {
-                $applied = Set-GameResolution -Dest $Dest -Width $w -Height $h
-                Write-Host "  applied resolution: $applied" -ForegroundColor Green
-            } else { throw "could not determine a valid resolution" }
-        } catch {
-            Write-Warning "  resolution step skipped ($($_.Exception.Message)). Game will run at 800x600."
-        }
-    }
-
-    # --- 6. shortcuts ---------------------------------------------------------
+    # --- 5. shortcuts ---------------------------------------------------------
     $ws = New-Object -ComObject WScript.Shell
     foreach ($dir in @([Environment]::GetFolderPath('Desktop'),
                         (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'))) {

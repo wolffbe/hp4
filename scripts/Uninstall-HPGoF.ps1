@@ -8,7 +8,7 @@
 
     Parameters
     ----------
-    -Dest         Install directory. Default: C:\Games\Harry Potter and the Goblet of Fire
+    -Dest         Install directory. Default: C:\Program Files (x86)\Electronic Arts\Harry Potter and the Goblet of Fire
     -RemoveFiles  Also delete the install directory.
 
     Usage:  right-click > Run with PowerShell
@@ -17,7 +17,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Dest = 'C:\Games\Harry Potter and the Goblet of Fire',
+    [string]$Dest = "${env:ProgramFiles(x86)}\Electronic Arts\Harry Potter and the Goblet of Fire",
     [switch]$RemoveFiles
 )
 
