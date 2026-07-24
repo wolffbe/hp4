@@ -80,10 +80,9 @@ authenticate against, the protected executable exits immediately (code 1) on
 Windows 10/11, and no compatibility shim can revive a driver that isn't present.
 
 These scripts install the disc's executable as-is and do not touch its copy
-protection. Getting the game to launch past SafeDisc (e.g. a no-CD build for the
-copy you own, such as the
-[PCGamingWiki fix](https://www.pcgamingwiki.com/wiki/Harry_Potter_and_the_Goblet_of_Fire))
-is up to you and out of scope for this repository.
+protection. Getting the game to launch past SafeDisc is up to you and out of
+scope for this repository — see
+[PCGamingWiki](https://www.pcgamingwiki.com/wiki/Harry_Potter_and_the_Goblet_of_Fire).
 
 ## Troubleshooting
 
